@@ -1,0 +1,119 @@
+---
+title: "Waldman.Final"
+output: pdf_document
+---
+
+I have used the report level data from the The Mass Mobilization in Autocracies Database which contains data from both anti- and pro-regime protest at the city level with daily resolution. The data set contains the following variables: an id code, the country code, location, longititude and latitutde, city name, the event date, the side of protest (pro- or anti- government), which actors were involved in the protest, the issue of the protest, the scope of the protest, whether or not there is violence, whether or not security engangement was necessary, and the number of participants. My goal is that through machine learning models, determine what affect the side fo the protest has on the presence of violence and the size of the protest. Also, if there is a relationship between size of the protests and the presence of violence. 
+
+Here, I have imported the data set and have named it reports. I have also compiled all of my package installations so that I dont repeat and will have an easier job knitting. 
+```{r}
+library(readr)
+reports <- read_csv("~/Downloads/reports.csv")
+#View(reports)
+
+#install.packages("topicmodels")
+#install.packages("tidytext")
+#install.packages("dplyr")
+#install.packages("tm")
+#install.packages("ggplot2")
+#install.packages("tidyr")
+#install.packages("broom")
+#install.packages("tidyverse")
+#install.packages("devtools")
+#install.packages("FactoMineR")
+#install.packages("factoextra")
+#install.packages("corrplot")
+library(topicmodels)
+library(tidytext)
+library(dplyr)
+library(tm)
+library(ggplot2)
+library(tidyr)
+library(broom)
+library(tidyverse)
+library(devtools)
+library(FactoMineR)
+library(factoextra)
+library(corrplot)
+```
+The first step in analyzing the resports is to preprocess the data so that it is in a useable format. However, all of the variables in the matrix are in numerical form without spaces, sparse terms, and stop words, etc. Therefore, all I am trying to do is to remove the entries where avg_numparticipants is NA
+```{r}
+new.reports<-cbind(reports$side, reports$part_violence, reports$avg_numparticipants)
+new.df<-as.data.frame(new.reports)
+```
+Here I am renaming the columns so that it is more intuitive which columns to use in the PCA analysis. 
+```{r}
+colnames(new.df)
+names(new.df)[names(new.df) == "V1"] <- "Side"
+names(new.df)[names(new.df) == "V2"] <- "Violence"
+names(new.df)[names(new.df) == "V3"] <- "Participants"
+colnames(new.df)
+```
+Now that new.df only contains the variables I am interested in using, it is possible to begin the process of Principal Component Analysis (PCA). PCA allows us to calculate the principal components that can be used in similar regression. Here, I am running principal component regressions on side, violence, and number of participants. One limitation with this data and PCA is that PCA is not traditionally used on quanititative or binary varibales, and side is represented by a 1 or a 0 (represeting for and against, respectively)  
+```{r include=FALSE}
+na.omit(new.df)
+DF <- na.omit(new.df)
+length(DF$Side)
+length(DF$Violence)
+length(DF$Participants)
+```
+
+```{r}
+prcomp(DF, center = TRUE, scale. = TRUE)
+PRCOMP <-prcomp(DF)
+```
+```{r}
+PCA(DF, scale.unit = TRUE, ncp = 4, graph = TRUE)
+```
+```{r}
+DF.pca <- PCA(DF, graph = FALSE)
+print(DF.pca)
+```
+```{r}
+eig.vl<-get_eigenvalue(DF.pca)
+eig.vl
+```
+```{r}
+fviz_eig(DF.pca, addlabels = TRUE, ylim=c(30,35))
+```
+The Scree Plot reveals that three is, in fact, the appropriate number of factors to analyze, as the elbow is rounding out at three.
+```{r}
+var <- get_pca_var(DF.pca)
+var
+```
+```{r}
+fviz_pca_var(DF.pca, col.var = "darkgreen")
+```
+```{r}
+corrplot(var$cos2, is.corr = FALSE)
+```
+This is a visible representation of the cos2 of variables on all three of the dimensions.
+```{r}
+fviz_cos2(DF.pca, choice = "var", axes = 1:2)
+```
+This graph reveals that number of participants is the most important in revealing if there will be violence or what side the ralley is for.
+```{r}
+fviz_pca_var(DF.pca, col.var = "cos2",
+             gradient.cols = c("red", "green", "blue"),
+             repel = TRUE
+             )
+```
+```{r}
+head(var$contrib, 4)
+```
+```{r}
+fviz_contrib(DF.pca, choice = "var", axes = 1, top = 10)
+fviz_contrib(DF.pca, choice = "var", axes = 2, top = 10)
+```
+```{r}
+fviz_contrib(DF.pca, choice = "var", axes = 1:2, top = 10)
+```
+The red-dashed line on the graphs above indicate average expectation of the variable in how it affects the principal components. What is revealed by all three graphs is that Participants, which is equal to avg_numparticipants, is the only consistent predictor of principal components.
+```{r}
+DF.desc<-dimdesc(DF.pca, axes = c(1,2), proba = 0.05)
+DF.desc$Dim.1
+DF.desc$Dim.2
+```
+This table revelas the most significantly associated variables for each given principal component. 
+
+Ultimately, what the PCA shows us is that the avg_numparticipants is the most important variable in determining if there will be violence. Side is not very telling of what the riot will look like. 
